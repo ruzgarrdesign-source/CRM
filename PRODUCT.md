@@ -39,6 +39,11 @@ Kullanıcı tarafından belirtilen kapsam:
 - Drive API üzerinden görsel arşiv oluşturma.
 - Personel verimliliği takibi.
 - İş takibi ve otomasyon.
+- İş talebinde firma adı ve görsel türü: Sosyal, Maç, Site, Full Paket.
+- Çalışanın iş durumunu Beklemede, Tasarım aşamasında, İptal ve Tamamlandı arasında değiştirmesi.
+- Aylık vardiya düzeni, ek mesai ve nedenli izin kaydı.
+- İşin teslim, bekleme ve tasarım sürelerinin grafikle sunulması ve Excel uyumlu CSV aktarımı.
+- Ofis gelir/gider panelinin yalnız sistem ve operasyon yöneticisi rollerinde gösterilmesi.
 
 Açık kararlar:
 

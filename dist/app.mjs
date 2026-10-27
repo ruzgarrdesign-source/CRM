@@ -1,4 +1,4 @@
-import {createInitialState,currentUser,visibleReports,visibleTasks,visibleShifts,canReview,reduceState,STATUS_LABELS} from './domain.mjs';
+import {createInitialState,currentUser,visibleReports,visibleTasks,visibleShifts,canReview,canAccessOffice,reduceState,migrateState,taskDurations,STATUS_LABELS,VISUAL_TYPES,OFFICE_CATEGORIES} from './domain.mjs';
 
 const $ = (q, root=document) => root.querySelector(q);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -29,17 +29,22 @@ const dateFmt=new Intl.DateTimeFormat('tr-TR',{day:'numeric',month:'short',hour:
 const dt=v=>v ? dateFmt.format(new Date(v)) : '—';
 const shortDate=v=>v ? new Date(v+'T12:00:00').toLocaleDateString('tr-TR',{day:'numeric',month:'long'}) : '—';
 const avatar=u=>'<span class="avatar">'+esc(u?.initials||'?')+'</span>';
-const badge=status=>'<span class="pill '+esc(status)+'">'+esc(STATUS_LABELS[status]||({todo:'Açık',doing:'Üretimde',done:'Tamamlandı'}[status])||status)+'</span>';
+const badge=status=>'<span class="pill '+esc(status)+'">'+esc(STATUS_LABELS[status]||status)+'</span>';
 const button=(action,label,style='secondary',ico='',extra='')=>'<button type="button" class="btn '+style+'" data-action="'+action+'" '+extra+'>'+(ico?icon(ico):'')+label+'</button>';
 const empty=(title,detail)=>'<div class="empty">'+icon('reviews')+'<h2>'+esc(title)+'</h2><p>'+esc(detail)+'</p></div>';
 let state, db, inMemory=false, busy=false;
-let ui={page:'review',selectedId:null,imageIndex:0,search:'',team:'',person:'',status:'pending',zoom:false,version:'',navOpen:false,formId:null,taskId:'',formImages:[],taskForm:false,shiftForm:false,reportStatus:'all',archiveStatus:'all',formError:''};
+let ui={page:'review',selectedId:null,imageIndex:0,search:'',team:'',person:'',status:'pending',zoom:false,version:'',navOpen:false,formId:null,taskId:'',formImages:[],taskForm:false,shiftForm:false,shiftEventForm:false,reportStatus:'all',archiveStatus:'all',formError:'',shiftMonth:new Date().toISOString().slice(0,7),reportMonth:'all',officeMonth:new Date().toISOString().slice(0,7)};
 const channel = 'BroadcastChannel' in window ? new BroadcastChannel('gorsel-operasyon-v1') : null;
 function notify(message,error=false){const el=$('#toast');el.textContent=message;el.className='show'+(error?' error':'');clearTimeout(notify.timer);notify.timer=setTimeout(()=>el.className='',4800)}
 function user(id){return state.users.find(u=>u.id===id)}
 function task(id){return state.tasks.find(t=>t.id===id)}
+function taskDisplayTitle(t){return t.company && !t.title.startsWith(t.company+' · ')?t.company+' · '+t.title:t.title}
 function teamName(id){return state.teams.find(t=>t.id===id)?.name||'—'}
 function isManager(){return currentUser(state).role!=='employee'}
+function officeAllowed(){return canAccessOffice(state)}
+const money=value=>new Intl.NumberFormat('tr-TR',{style:'currency',currency:'TRY',maximumFractionDigits:2}).format(value||0);
+const duration=ms=>ms===null||ms===undefined?'—':ms<3600000?Math.round(ms/60000)+' dk':(ms/3600000).toLocaleString('tr-TR',{maximumFractionDigits:1})+' sa';
+const monthTitle=month=>new Date(month+'-01T12:00:00').toLocaleDateString('tr-TR',{month:'long',year:'numeric'});
 function scopeUsers(){const u=currentUser(state);return state.users.filter(p=>u.role==='employee'?p.id===u.id:u.role==='team_lead'?p.teamId===u.teamId:true)}
 function selectableWorkers(){return scopeUsers().filter(u=>u.role==='employee'||u.role==='team_lead')}
 function selectedReport(){return visibleReports(state).find(r=>r.id===ui.selectedId)}
@@ -77,8 +82,9 @@ async function replaceState(next){
 const pageInfo={
  review:['İnceleme','Görselleri incele, geri bildirim ver ve üretimi ilerlet.'],
  tasks:['İşler','Üretimin her adımı, tek bir yerde.'],
- reports:['Raporlar','Teslimleri, revizyonları ve karar geçmişini takip et.'],
- shifts:['Vardiyalar','Ekibin çalışma planını ve görev dağılımını gör.'],
+ reports:['Raporlar','Teslim, bekleme ve tasarım sürelerini iş kayıtlarıyla birlikte incele.'],
+ shifts:['Vardiyalar','Aylık vardiyaları, ek mesai ve izin kayıtlarını yönet.'],
+ office:['Ofis','Gelir ve gider kayıtlarını yalnız yönetici rollerinde takip et.'],
  archive:['Görsel arşiv','Her görselin arkasındaki işe ve rapora ulaş.'],
  team:['Ekip ve özetler','Üretim kayıtlarını gör. Sayılar bir performans puanı değildir.'],
  settings:['Ayarlar','Çalışma alanı, demo rolleri ve entegrasyon durumu.'],
@@ -96,7 +102,7 @@ function shell(content){
   return '<div class="shell '+(ui.navOpen?'nav-open':'')+'">'+(ui.navOpen?'<button type="button" class="nav-backdrop" data-action="close-menu" aria-label="Menüyü kapat"></button>':'')+'<aside id="sidebar-menu" class="sidebar" aria-label="Ana gezinme"><button type="button" class="icon-btn sidebar-close" data-action="close-menu" aria-label="Menüyü kapat">'+icon('close')+'</button><div class="brand"><span class="brand-mark"><i></i><i></i><i></i><i></i></span><div class="brand-text">Görsel Operasyon<small>Üretim çalışma alanı</small></div></div><nav class="nav">'+
   (isManager()?navItem('review','İnceleme','reviews',pending):'')+
   navItem('tasks',me.role==='employee'?'İşlerim':'İşler','tasks')+navItem('reports',me.role==='employee'?'Raporlarım':'Raporlar','report')+navItem('shifts',me.role==='employee'?'Vardiyalarım':'Vardiyalar','calendar')+
-  '<div class="nav-separator"></div>'+navItem('archive','Görsel arşiv','image')+navItem('team',me.role==='employee'?'Üretim özetim':'Ekip ve özetler','users')+navItem('settings','Ayarlar','settings')+
+  '<div class="nav-separator"></div>'+navItem('archive','Görsel arşiv','image')+navItem('team',me.role==='employee'?'Üretim özetim':'Ekip ve özetler','users')+(officeAllowed()?navItem('office','Ofis','grid'):'')+navItem('settings','Ayarlar','settings')+
   '</nav><div class="sidebar-foot"><div class="connection">'+icon('cloud')+'<div><strong>Yerel demo arşivi</strong><span>Drive henüz bağlı değil</span></div></div><div class="actor"><label for="actor">DEMO · ROLÜ DENE</label><select id="actor" data-control="actor">'+actorOptions()+'</select></div><div class="user-line">'+avatar(me)+'<div>'+esc(me.name)+'<small>'+esc(roleNames[me.role])+'</small></div></div></div></aside>'+
   '<div class="workspace"><header class="topbar"><button class="icon-btn menu-toggle" data-action="menu" aria-controls="sidebar-menu" aria-expanded="'+ui.navOpen+'" aria-label="Menüyü aç veya kapat">'+icon('menu')+'</button><div class="breadcrumb">Çalışma alanı <span aria-hidden="true"> / </span> <strong>'+esc(title)+'</strong></div><div class="topbar-actions"><span class="demo-tag">DEMO · ÖRNEK VERİLER</span><button class="icon-btn notification-button" data-page="notifications" aria-label="Bildirimler'+(unread?', '+unread+' okunmamış':'')+'">'+icon('bell')+(unread?'<span class="notification-dot"></span>':'')+'</button>'+avatar(me)+'</div></header>'+
   '<main id="main"><div class="page-head"><div><h1>'+esc(title)+'</h1><p>'+esc(info[1])+'</p></div><div class="head-date">'+new Date().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric',weekday:'long'})+'</div></div><div class="page-content">'+(inMemory?'<div class="notice warning">Tarayıcı depolaması kullanılamıyor. Bu oturumdaki değişiklikler sayfa kapanınca silinir.</div>':'')+content+'</div></main></div></div>';
@@ -121,7 +127,7 @@ function viewer(r){
 function detail(r){
   const v=ui.version?r.versions?.find(item=>String(item.revision)===ui.version):null,view=v||r;
   const u=user(r.authorId),t=task(view.taskId),shift=state.shifts.find(s=>s.id===view.shiftId),reviewable=canReview(state,r)&&!ui.version;
-  return '<aside class="details" aria-label="Rapor bilgileri ve karar"><div class="pane-title">Rapor bilgileri '+badge(r.status)+'</div><div class="detail-body"><div class="report-id">Rapor '+esc(r.id.toUpperCase())+(v?' · Önceki gönderim v'+v.revision:'')+'</div><h2>'+esc(view.title)+'</h2><div class="person">'+avatar(u)+'<div><strong style="font-size:12px">'+esc(u?.name)+'</strong><div class="muted" style="font-size:10px">'+esc(teamName(r.teamId))+'</div></div></div><dl class="metadata"><dt>İş</dt><dd>'+esc(t?.title||'—')+'</dd><dt>Vardiya</dt><dd>'+esc(shift?shortDate(shift.date)+' · '+shift.start+'–'+shift.end:'Belirtilmedi')+'</dd><dt>Gönderim</dt><dd>'+esc(dt(view.submittedAt))+'</dd><dt>Dosya</dt><dd>'+view.images.length+' görsel</dd></dl><hr class="section-rule"><h3>Üretim notu</h3><p class="note">'+esc(view.note||'Üretim notu eklenmemiş.')+'</p>'+
+  return '<aside class="details" aria-label="Rapor bilgileri ve karar"><div class="pane-title">Rapor bilgileri '+badge(r.status)+'</div><div class="detail-body"><div class="report-id">Rapor '+esc(r.id.toUpperCase())+(v?' · Önceki gönderim v'+v.revision:'')+'</div><h2>'+esc(view.title)+'</h2><div class="person">'+avatar(u)+'<div><strong style="font-size:12px">'+esc(u?.name)+'</strong><div class="muted" style="font-size:10px">'+esc(teamName(r.teamId))+'</div></div></div><dl class="metadata"><dt>Firma</dt><dd>'+esc(t?.company||'—')+'</dd><dt>Görsel türü</dt><dd>'+esc(VISUAL_TYPES[t?.visualType]||'—')+'</dd><dt>İş</dt><dd>'+esc(t?.title||'—')+'</dd><dt>Vardiya</dt><dd>'+esc(shift?shortDate(shift.date)+' · '+shift.start+'–'+shift.end:'Belirtilmedi')+'</dd><dt>Gönderim</dt><dd>'+esc(dt(view.submittedAt))+'</dd><dt>Dosya</dt><dd>'+view.images.length+' görsel</dd></dl><hr class="section-rule"><h3>Üretim notu</h3><p class="note">'+esc(view.note||'Üretim notu eklenmemiş.')+'</p>'+
   (t?.description?'<hr class="section-rule"><h3>İşin kapsamı</h3><p class="note">'+esc(t.description)+'</p>':'')+
   (r.versions?.length>1?'<hr class="section-rule"><label for="version-select">Gönderim sürümü</label><div class="field"><select id="version-select" data-control="version"><option value="">Güncel gönderim · v'+r.revision+'</option>'+r.versions.filter(v=>v.revision<r.revision).map(v=>'<option value="'+v.revision+'" '+(ui.version===String(v.revision)?'selected':'')+'>Önceki v'+v.revision+' · '+esc(dt(v.submittedAt))+'</option>').join('')+'</select></div>':'')+
   (r.feedback.length?'<hr class="section-rule"><h3>Geri bildirim</h3>'+r.feedback.map(f=>'<div class="history-entry">'+esc(f.text)+(f.imageIds?.length?'<div class="feedback-images">'+f.imageIds.map(id=>{const im=feedbackImage(r,id);return im?'<button type="button" class="feedback-image" data-action="open-feedback-image" data-report="'+r.id+'" data-image="'+esc(id)+'" title="'+esc(im.name)+' görselini aç"><img src="'+esc(imageSource(im.src))+'" alt=""><span>'+esc(im.name)+'</span>'+icon('expand')+'</button>':''}).join('')+'</div>':'')+'<time>'+esc(user(f.byId)?.name)+' · '+esc(dt(f.at))+'</time></div>').join(''):'')+
@@ -132,15 +138,24 @@ function detail(r){
 }
 function tasksPage(){
   const list=visibleTasks(state),manager=isManager();
-  return '<div class="list-toolbar"><div class="tabs"><span class="muted">'+list.length+' iş · '+list.filter(t=>t.status==='doing').length+' üretimde</span></div>'+(manager?button('toggle-task','İş oluştur','','plus'):'')+'</div>'+
-  (ui.taskForm?taskForm():'')+(list.length?'<div class="table-wrap"><table><thead><tr><th>İş</th><th>Atanan</th><th>Durum</th><th>Teslim tarihi</th><th>İşlem</th></tr></thead><tbody>'+list.map(t=>'<tr><td><strong>'+esc(t.title)+'</strong><small>'+esc(t.description)+'</small></td><td><div class="person">'+avatar(user(t.assigneeId))+esc(user(t.assigneeId)?.name)+'</div></td><td>'+badge(t.status)+'</td><td>'+esc(shortDate(t.dueDate))+'</td><td><div style="display:flex;gap:6px;flex-wrap:wrap">'+(t.status==='todo'?button('start-task','Başla','secondary compact','','data-id="'+t.id+'"'):'')+(t.status==='doing'?button('finish-task','Tamamlandı bildir','secondary compact','','data-id="'+t.id+'"'):'')+(t.assigneeId===state.currentUserId?button('new-report','Rapor hazırla','soft compact','','data-task="'+t.id+'"'):'')+'</div></td></tr>').join('')+'</tbody></table></div>':empty('Henüz iş yok',manager?'İlk işi oluşturup bir çalışana atayabilirsin.':'Sana atanan işler burada görünecek.'))+
-  '<p class="local-note">İşin tamamlanma bildirimi, raporun onayından ayrı tutulur.</p>';
+  return '<div class="list-toolbar"><div class="tabs"><span class="muted">'+list.length+' iş · '+list.filter(t=>t.status==='design').length+' tasarım aşamasında</span></div>'+(manager?button('toggle-task','İş talebi oluştur','','plus'):'')+'</div>'+
+  (ui.taskForm?taskForm():'')+(list.length?'<div class="table-wrap"><table class="task-table"><thead><tr><th>Firma ve iş</th><th>Görsel türü</th><th>Atanan</th><th>Durum</th><th>Teslim tarihi</th><th>İşlem</th></tr></thead><tbody>'+list.map(t=>'<tr><td><strong>'+esc(taskDisplayTitle(t))+'</strong><small>'+esc(t.company?'': 'Firma eklenmedi · ')+esc(t.description)+'</small></td><td>'+esc(VISUAL_TYPES[t.visualType]||'Belirtilmedi')+'</td><td><div class="person">'+avatar(user(t.assigneeId))+esc(user(t.assigneeId)?.name)+'</div></td><td><label class="sr-only" for="task-status-'+esc(t.id)+'">'+esc(t.title)+' durumu</label><select id="task-status-'+esc(t.id)+'" class="status-select" data-control="task-status" data-id="'+esc(t.id)+'">'+Object.entries(STATUS_LABELS).filter(([key])=>['waiting','design','canceled','completed'].includes(key)).map(([key,label])=>'<option value="'+key+'" '+(t.status===key?'selected':'')+'>'+esc(label)+'</option>').join('')+'</select></td><td>'+esc(shortDate(t.dueDate))+'</td><td>'+(t.assigneeId===state.currentUserId?button('new-report','Rapor hazırla','soft compact','','data-task="'+t.id+'"'):'<span class="muted">—</span>')+'</td></tr>').join('')+'</tbody></table></div>':empty('Henüz iş yok',manager?'İlk iş talebini oluşturup bir çalışana atayabilirsin.':'Sana atanan işler burada görünecek.'))+
+  '<p class="local-note">Çalışan kendi işinin durumunu doğrudan değiştirebilir. Durum geçmişi süre raporuna yansır; rapor onayı ayrı bir karardır.</p>';
 }
-function taskForm(){return '<form id="task-form" class="panel inline-form"><h2>Yeni iş</h2><div class="field"><label for="task-title">İş başlığı</label><input id="task-title" name="title" required maxlength="180"></div><div class="field"><label for="task-description">İşin kapsamı</label><textarea id="task-description" name="description" required maxlength="2000"></textarea></div><div class="field-row"><div class="field"><label for="task-assignee">Atanan kişi</label><select id="task-assignee" name="assigneeId">'+selectableWorkers().map(u=>'<option value="'+u.id+'">'+esc(u.name)+'</option>').join('')+'</select></div><div class="field"><label for="task-due">Teslim tarihi</label><input type="date" id="task-due" name="dueDate"></div></div><div class="form-actions">'+button('toggle-task','Vazgeç','secondary')+'<button class="btn" type="submit">İşi oluştur</button></div></form>'}
+function taskForm(){return '<form id="task-form" class="panel inline-form"><h2>Yeni iş talebi</h2><div class="field-row"><div class="field"><label for="task-company">Firma adı</label><input id="task-company" name="company" required maxlength="120" placeholder="Örn. Forma"></div><div class="field"><label for="task-visual">Görsel türü</label><select id="task-visual" name="visualType" required><option value="">Tür seçin</option>'+Object.entries(VISUAL_TYPES).map(([key,label])=>'<option value="'+key+'">'+esc(label)+'</option>').join('')+'</select></div></div><div class="field"><label for="task-title">İş başlığı</label><input id="task-title" name="title" required maxlength="180"></div><div class="field"><label for="task-description">İşin kapsamı</label><textarea id="task-description" name="description" required maxlength="2000"></textarea></div><div class="field-row"><div class="field"><label for="task-assignee">Atanan kişi</label><select id="task-assignee" name="assigneeId">'+selectableWorkers().map(u=>'<option value="'+u.id+'">'+esc(u.name)+'</option>').join('')+'</select></div><div class="field"><label for="task-due">Teslim tarihi</label><input type="date" id="task-due" name="dueDate"></div></div><div class="form-actions">'+button('toggle-task','Vazgeç','secondary')+'<button class="btn" type="submit">Talebi oluştur</button></div></form>'}
 function reportsPage(){
   const list=ownReports().filter(r=>ui.reportStatus==='all'||r.status===ui.reportStatus).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
-  return '<div class="list-toolbar"><div class="tabs">'+['all','draft','pending','revision','approved'].map(s=>'<button class="tab '+(ui.reportStatus===s?'active':'')+'" data-action="report-tab" data-value="'+s+'">'+(s==='all'?'Tümü':esc(STATUS_LABELS[s]))+'</button>').join('')+'</div>'+button('new-report','Rapor hazırla','','plus')+'</div>'+
-  (list.length?'<div class="table-wrap"><table><thead><tr><th>Rapor</th><th>Çalışan</th><th>Görsel</th><th>Durum</th><th>Gönderim</th><th>İşlem</th></tr></thead><tbody>'+list.map(r=>'<tr><td><strong>'+esc(r.title)+'</strong><small>'+esc(r.id.toUpperCase())+' · v'+r.revision+'</small></td><td>'+esc(user(r.authorId)?.name)+'</td><td>'+r.images.length+'</td><td>'+badge(r.status)+'</td><td>'+esc(dt(r.submittedAt))+'</td><td>'+button('open-report','Raporu aç','secondary compact','arrow','data-id="'+r.id+'"')+'</td></tr>').join('')+'</tbody></table></div>':empty('Bu durumda rapor yok','Diğer durumları seçebilir veya yeni rapor hazırlayabilirsin.'));
+  const tasks=visibleTasks(state).filter(t=>ui.reportMonth==='all'||t.createdAt?.startsWith(ui.reportMonth));
+  const measured=tasks.map(t=>({task:t,times:taskDurations(t)}));
+  const exact=measured.filter(item=>!item.times.approximate);
+  const completed=exact.filter(item=>item.times.deliveryMs!==null);
+  const avg=completed.length?completed.reduce((sum,item)=>sum+item.times.deliveryMs,0)/completed.length:null;
+  const totalWaiting=exact.reduce((sum,item)=>sum+item.times.waitingMs,0);
+  const totalDesign=exact.reduce((sum,item)=>sum+item.times.designMs,0);
+  const max=Math.max(1,...exact.map(item=>Math.max(item.times.waitingMs,item.times.designMs)));
+  const chart=measured.length?measured.map(({task:t,times})=>'<div class="duration-row"><div class="duration-name"><strong>'+esc(taskDisplayTitle(t))+'</strong><span>'+esc(user(t.assigneeId)?.name)+' · '+esc(VISUAL_TYPES[t.visualType]||'Tür belirtilmedi')+'</span></div>'+(times.approximate?'<span class="muted">Eski kayıtta süre geçmişi yok</span>':'<div class="duration-bars"><div><span>Bekleme</span><div class="bar-track"><i class="bar waiting-bar" style="width:'+Math.max(times.waitingMs?2:0,100*times.waitingMs/max)+'%"></i></div><b>'+duration(times.waitingMs)+'</b></div><div><span>Tasarım</span><div class="bar-track"><i class="bar design-bar" style="width:'+Math.max(times.designMs?2:0,100*times.designMs/max)+'%"></i></div><b>'+duration(times.designMs)+'</b></div></div>')+'<div class="delivery-cell">Teslim <strong>'+duration(times.deliveryMs)+'</strong></div></div>').join(''):empty('Bu ay için ölçüm yok','Başka bir ay seçebilir veya yeni iş talebi oluşturabilirsin.');
+  return '<div class="report-toolbar"><div class="field compact-field"><label for="report-month">İş oluşturma ayı</label><select id="report-month" data-control="report-month"><option value="all">Tüm zamanlar</option>'+[...new Set(visibleTasks(state).map(t=>t.createdAt?.slice(0,7)).filter(Boolean))].sort().reverse().map(month=>'<option value="'+month+'" '+(ui.reportMonth===month?'selected':'')+'>'+esc(monthTitle(month))+'</option>').join('')+'</select></div>'+button('export-excel','Excel için CSV indir','secondary','download')+'</div><div class="metric-strip"><div><span>İş sayısı</span><strong>'+tasks.length+'</strong></div><div><span>Ortalama teslim</span><strong>'+duration(avg)+'</strong></div><div><span>Toplam bekleme</span><strong>'+duration(totalWaiting)+'</strong></div><div><span>Toplam tasarım</span><strong>'+duration(totalDesign)+'</strong></div></div><section class="panel report-analysis"><div class="section-heading"><div><h2>İş süreleri</h2><p>İş talebinden tamamlanmaya kadar geçen süre ile durumlarda geçirilen süreler.</p></div><div class="chart-legend"><span><i class="legend-waiting"></i> Bekleme</span><span><i class="legend-design"></i> Tasarım</span></div></div>'+chart+'<p class="local-note">Açık işlerde teslim süresi boş kalır. Eski demo kayıtları durum geçmişi içermediği için süre hesabına katılmaz. Süreler iş durumu değişikliklerinden hesaplanır.</p></section><div class="list-toolbar"><div class="tabs">'+['all','draft','pending','revision','approved'].map(s=>'<button class="tab '+(ui.reportStatus===s?'active':'')+'" data-action="report-tab" data-value="'+s+'">'+(s==='all'?'Tümü':esc(STATUS_LABELS[s]))+'</button>').join('')+'</div>'+button('new-report','Rapor hazırla','','plus')+'</div>'+
+  (list.length?'<div class="table-wrap"><table><thead><tr><th>Rapor</th><th>Firma / tür</th><th>Çalışan</th><th>Görsel</th><th>Durum</th><th>Gönderim</th><th>İşlem</th></tr></thead><tbody>'+list.map(r=>{const t=task(r.taskId);return '<tr><td><strong>'+esc(r.title)+'</strong><small>'+esc(r.id.toUpperCase())+' · v'+r.revision+'</small></td><td>'+esc(t?.company||'—')+'<small>'+esc(VISUAL_TYPES[t?.visualType]||'—')+'</small></td><td>'+esc(user(r.authorId)?.name)+'</td><td>'+r.images.length+'</td><td>'+badge(r.status)+'</td><td>'+esc(dt(r.submittedAt))+'</td><td>'+button('open-report','Raporu aç','secondary compact','arrow','data-id="'+r.id+'"')+'</td></tr>'}).join('')+'</tbody></table></div>':empty('Bu durumda rapor yok','Diğer durumları seçebilir veya yeni rapor hazırlayabilirsin.'));
 }
 function prepareForm(id=null,taskId=''){
   const r=ownReports().find(r=>r.id===id);
@@ -148,7 +163,7 @@ function prepareForm(id=null,taskId=''){
   ui.formId=id;ui.taskId=taskId||r?.taskId||'';ui.formImages=r?structuredClone(r.images):[];ui.formError='';navigate('form');
 }
 function formPage(){
-  const r=ownReports().find(r=>r.id===ui.formId),tasks=visibleTasks(state).filter(t=>t.assigneeId===state.currentUserId),shifts=visibleShifts(state).filter(s=>s.userId===state.currentUserId);
+  const r=ownReports().find(r=>r.id===ui.formId),tasks=visibleTasks(state).filter(t=>t.assigneeId===state.currentUserId&&t.status!=='canceled'),shifts=visibleShifts(state).filter(s=>s.userId===state.currentUserId&&(!s.kind||s.kind==='shift'));
   if(!tasks.length)return empty('Sana atanmış iş bulunmuyor','Rapor hazırlayabilmek için bir iş atanmalı. Demo rol seçicisinden Ayşe Demir veya Can Öz ile çalışan akışını deneyebilirsin.');
   return '<div class="notice">'+icon('cloud')+'<div>Demo arşivi: Yüklenen dosyalar yalnızca bu tarayıcıda saklanır. Google Drive’a aktarılmaz.</div></div><div class="form-layout"><form id="report-form" class="panel">'+
   (r?.status==='revision'?'<div class="notice warning"><div><strong>Bu rapor için revizyon istendi.</strong>'+r.feedback.slice(-1).map(f=>'<p>'+esc(f.text)+'</p>').join('')+'</div></div>':'')+
@@ -156,10 +171,22 @@ function formPage(){
 }
 function uploadItems(){return ui.formImages.map((im,i)=>'<div class="upload-item"><img src="'+esc(imageSource(im.src))+'" alt="'+esc(im.name)+'"><p title="'+esc(im.name)+'">'+esc(im.name)+'</p><button type="button" data-action="remove-upload" data-index="'+i+'">Kaldır</button></div>').join('')}
 function shiftsPage(){
-  const list=visibleShifts(state).slice().sort((a,b)=>a.date.localeCompare(b.date)||a.start.localeCompare(b.start));
-  return '<div class="list-toolbar"><p class="muted">'+list.length+' vardiya kaydı</p>'+(isManager()?button('toggle-shift','Vardiya planla','','plus'):'')+'</div>'+
-  (ui.shiftForm?'<form class="panel inline-form" id="shift-form"><h2>Vardiya planla</h2><div class="field-row"><div class="field"><label for="shift-user">Çalışan</label><select id="shift-user" name="userId">'+selectableWorkers().map(u=>'<option value="'+u.id+'">'+esc(u.name)+'</option>').join('')+'</select></div><div class="field"><label for="shift-date">Tarih</label><input id="shift-date" type="date" name="date" required></div></div><div class="field-row"><div class="field"><label for="shift-start">Başlangıç</label><input id="shift-start" type="time" name="start" value="09:00" required></div><div class="field"><label for="shift-end">Bitiş</label><input id="shift-end" type="time" name="end" value="18:00" required></div></div><small>Bu prototip aynı gün içinde biten vardiyaları destekler.</small><div class="form-actions">'+button('toggle-shift','Vazgeç','secondary')+'<button class="btn" type="submit">Vardiyayı kaydet</button></div></form>':'')+
-  (list.length?'<div class="table-wrap"><table><thead><tr><th>Çalışan</th><th>Ekip</th><th>Tarih</th><th>Başlangıç</th><th>Bitiş</th><th>Kayıt türü</th></tr></thead><tbody>'+list.map(s=>'<tr><td><div class="person">'+avatar(user(s.userId))+'<strong>'+esc(user(s.userId)?.name)+'</strong></div></td><td>'+esc(teamName(s.teamId))+'</td><td>'+shortDate(s.date)+'</td><td>'+esc(s.start)+'</td><td>'+esc(s.end)+'</td><td><span class="pill draft">Planlanan</span></td></tr>').join('')+'</tbody></table></div>':empty('Planlanmış vardiya yok','Atanan vardiyalar burada gösterilecek.'))+'<p class="local-note">Planlanan vardiyalar gerçekleşmiş çalışma süresi veya puantaj olarak sayılmaz.</p>';
+  const list=visibleShifts(state).filter(s=>s.date.startsWith(ui.shiftMonth)).slice().sort((a,b)=>a.date.localeCompare(b.date)||a.start.localeCompare(b.start));
+  const [year,month]=ui.shiftMonth.split('-').map(Number),days=new Date(year,month,0).getDate(),offset=(new Date(year,month-1,1).getDay()+6)%7;
+  const calendar=Array.from({length:offset},()=>'<div class="calendar-day outside" aria-hidden="true"></div>').join('')+Array.from({length:days},(_,i)=>{const day=i+1,date=ui.shiftMonth+'-'+String(day).padStart(2,'0'),items=list.filter(s=>s.date===date);return '<div class="calendar-day"><div class="calendar-date">'+day+'</div>'+items.slice(0,3).map(s=>'<span class="calendar-entry '+esc(s.kind||'shift')+'" title="'+esc(user(s.userId)?.name)+' · '+esc(s.kind==='leave'?'İzin · '+s.reason:s.start+'–'+s.end+(s.reason?' · '+s.reason:''))+'">'+esc(user(s.userId)?.name?.split(' ')[0])+' · '+(s.kind==='leave'?'İzin':s.kind==='overtime'?'Mesai':'Vardiya')+'</span>').join('')+(items.length>3?'<small>+'+(items.length-3)+' kayıt</small>':'')+'</div>'}).join('');
+  return '<div class="list-toolbar"><div class="field compact-field"><label for="shift-month">Ay seç</label><input id="shift-month" type="month" data-control="shift-month" value="'+esc(ui.shiftMonth)+'"></div><div class="toolbar-actions">'+(isManager()?button('toggle-shift','Aylık düzen ekle','','plus')+button('toggle-shift-event','Mesai / izin ekle','secondary','clock'):'')+'</div></div>'+
+  (ui.shiftForm?'<form class="panel inline-form" id="monthly-shift-form"><h2>Aylık vardiya düzeni</h2><div class="field-row"><div class="field"><label for="shift-user">Çalışan</label><select id="shift-user" name="userId">'+selectableWorkers().map(u=>'<option value="'+u.id+'">'+esc(u.name)+'</option>').join('')+'</select></div><div class="field"><label for="shift-plan-month">Ay</label><input id="shift-plan-month" type="month" name="month" value="'+esc(ui.shiftMonth)+'" required></div></div><fieldset class="weekday-set"><legend>Çalışma günleri</legend>'+['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'].map((label,i)=>'<label><input type="checkbox" name="weekday" value="'+((i+1)%7)+'" '+(i<5?'checked':'')+'>'+label+'</label>').join('')+'</fieldset><div class="field-row"><div class="field"><label for="shift-start">Başlangıç</label><input id="shift-start" type="time" name="start" value="09:00" required></div><div class="field"><label for="shift-end">Bitiş</label><input id="shift-end" type="time" name="end" value="18:00" required></div></div><small>Aynı gün biten vardiyalar eklenir. Çakışan günler atlanır.</small><div class="form-actions">'+button('toggle-shift','Vazgeç','secondary')+'<button class="btn" type="submit">Ayı planla</button></div></form>':'')+
+  (ui.shiftEventForm?'<form class="panel inline-form" id="shift-event-form"><h2>Ek mesai / izin kaydı</h2><div class="field-row"><div class="field"><label for="event-user">Çalışan</label><select id="event-user" name="userId">'+selectableWorkers().map(u=>'<option value="'+u.id+'">'+esc(u.name)+'</option>').join('')+'</select></div><div class="field"><label for="event-kind">Kayıt türü</label><select id="event-kind" name="kind" data-control="event-kind"><option value="overtime">Ek mesai</option><option value="leave">İzin</option></select></div></div><div class="field-row"><div class="field"><label for="event-date">Tarih</label><input id="event-date" type="date" name="date" required></div><div class="field event-time"><label for="event-start">Başlangıç</label><input id="event-start" type="time" name="start" value="18:00" required></div><div class="field event-time"><label for="event-end">Bitiş</label><input id="event-end" type="time" name="end" value="20:00" required></div></div><div class="field"><label for="event-reason">Neden / açıklama</label><textarea id="event-reason" name="reason" maxlength="500" required placeholder="Mesai veya izin nedenini yazın"></textarea></div><div class="form-actions">'+button('toggle-shift-event','Vazgeç','secondary')+'<button class="btn" type="submit">Kaydı ekle</button></div></form>':'')+
+  '<section class="month-calendar" aria-label="'+esc(monthTitle(ui.shiftMonth))+' vardiya takvimi"><div class="calendar-heading">'+['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'].map(label=>'<span>'+label+'</span>').join('')+'</div><div class="calendar-grid">'+calendar+'</div></section>'+
+  (list.length?'<div class="table-wrap"><table><thead><tr><th>Çalışan</th><th>Tarih</th><th>Kayıt</th><th>Saat</th><th>Neden</th></tr></thead><tbody>'+list.map(s=>'<tr><td><div class="person">'+avatar(user(s.userId))+'<strong>'+esc(user(s.userId)?.name)+'</strong></div></td><td>'+shortDate(s.date)+'</td><td>'+esc(s.kind==='overtime'?'Ek mesai':s.kind==='leave'?'İzin':'Vardiya')+'</td><td>'+esc(s.kind==='leave'?'Tam gün':s.start+'–'+s.end)+'</td><td>'+esc(s.reason||'—')+'</td></tr>').join('')+'</tbody></table></div>':empty('Bu ay kayıt yok','Ayı değiştirebilir veya aylık vardiya düzeni ekleyebilirsin.'))+'<p class="local-note">Planlanan vardiyalar gerçekleşmiş çalışma süresi veya puantaj olarak sayılmaz.</p>';
+}
+function officePage(){
+  if(!officeAllowed())return empty('Bu panele erişim yok','Ofis gelir ve giderlerini yalnız sistem ve operasyon yöneticileri görebilir.');
+  const list=(state.officeEntries||[]).filter(item=>item.date.startsWith(ui.officeMonth)).slice().sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt));
+  const income=list.filter(item=>item.kind==='income').reduce((sum,item)=>sum+item.amount,0);
+  const expense=list.filter(item=>item.kind==='expense').reduce((sum,item)=>sum+item.amount,0);
+  return '<div class="report-toolbar"><div class="field compact-field"><label for="office-month">Dönem</label><input id="office-month" type="month" data-control="office-month" value="'+esc(ui.officeMonth)+'"></div>'+button('export-office','Ofis kayıtlarını CSV indir','secondary','download')+'</div><div class="metric-strip office-metrics"><div><span>Gelir</span><strong>'+money(income)+'</strong></div><div><span>Gider</span><strong>'+money(expense)+'</strong></div><div><span>Net</span><strong>'+money(income-expense)+'</strong></div></div><form id="office-form" class="panel inline-form office-form"><h2>Gelir / gider ekle</h2><div class="field-row"><div class="field"><label for="office-kind">Kayıt türü</label><select id="office-kind" name="kind" data-control="office-kind"><option value="income">Gelir</option><option value="expense">Gider</option></select></div><div class="field"><label for="office-date">Tarih</label><input id="office-date" type="date" name="date" required value="'+new Date().toISOString().slice(0,10)+'"></div><div class="field"><label for="office-amount">Tutar (₺)</label><input id="office-amount" type="number" name="amount" min="0.01" max="100000000" step="0.01" required></div></div><div class="field-row"><div class="field"><label for="office-category">Kategori</label><select id="office-category" name="category">'+OFFICE_CATEGORIES.income.map(item=>'<option>'+esc(item)+'</option>').join('')+'</select></div><div class="field"><label for="office-description">Açıklama</label><input id="office-description" name="description" maxlength="500" required placeholder="Kayıt nedeni"></div></div><div class="form-actions"><button class="btn" type="submit">Kaydı ekle</button></div></form>'+
+  (list.length?'<div class="table-wrap"><table><thead><tr><th>Tarih</th><th>Tür</th><th>Kategori</th><th>Açıklama</th><th>Tutar</th><th>Ekleyen</th></tr></thead><tbody>'+list.map(item=>'<tr><td>'+esc(shortDate(item.date))+'</td><td><span class="pill '+(item.kind==='income'?'approved':'canceled')+'">'+(item.kind==='income'?'Gelir':'Gider')+'</span></td><td>'+esc(item.category)+'</td><td>'+esc(item.description)+'</td><td><strong>'+money(item.amount)+'</strong></td><td>'+esc(user(item.byId)?.name||'—')+'</td></tr>').join('')+'</tbody></table></div>':empty('Bu ay ofis kaydı yok','İlk gelir veya gider kaydını ekleyebilirsin.'))+'<p class="local-note">Bu panel demo verilerini tarayıcıda saklar; muhasebe kaydı veya ortak ofis veritabanı değildir.</p>';
 }
 function archivePage(){
   const list=ownReports().filter(r=>r.status!=='draft'&&(ui.archiveStatus==='all'||r.status===ui.archiveStatus));
@@ -177,7 +204,8 @@ function notificationsPage(){
   return '<div class="list-toolbar"><p class="muted">'+list.filter(n=>!n.read).length+' okunmamış bildirim</p>'+button('read-notifications','Tümünü okundu işaretle','secondary','check')+'</div>'+(list.length?'<div class="panel notifications" style="padding:0">'+list.map(n=>'<div class="notification-row '+(!n.read?'unread':'')+'">'+icon('bell')+'<div><p>'+esc(n.text)+'</p><small>'+esc(dt(n.at))+'</small></div>'+button('open-report','Aç','secondary compact','arrow','data-id="'+n.reportId+'"')+'</div>').join('')+'</div>':empty('Henüz bildirim yok','Gönderim ve inceleme kararlarının bildirimleri burada görünecek.'));
 }
 function render(){
-  const pages={review:reviewPage,tasks:tasksPage,reports:reportsPage,form:formPage,shifts:shiftsPage,archive:archivePage,team:teamPage,settings:settingsPage,notifications:notificationsPage};
+  if(ui.page==='office'&&!officeAllowed())ui.page='tasks';
+  const pages={review:reviewPage,tasks:tasksPage,reports:reportsPage,form:formPage,shifts:shiftsPage,office:officePage,archive:archivePage,team:teamPage,settings:settingsPage,notifications:notificationsPage};
   $('#app').innerHTML=shell((pages[ui.page]||reviewPage)());document.title=(pageInfo[ui.page]?.[0]||'İnceleme')+' — Görsel Operasyon';
   $('#main-image')?.addEventListener('error',()=>{const canvas=$('.canvas');if(canvas)canvas.innerHTML='<div class="image-empty">Görsel açılamadı. Dosyayı kontrol et veya yeniden yükle.</div>';$('#app [data-action="approve"]')?.setAttribute('disabled','')});
 }
@@ -188,6 +216,30 @@ function showImage(src,name){
 }
 function exportData(){
   const reports=ownReports(),payload={exportedAt:new Date().toISOString(),demo:true,scope:currentUser(state).name,reports,tasks:visibleTasks(state),shifts:visibleShifts(state)},blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='gorsel-operasyon-demo-kayitlari.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);notify('Görünür kayıtlar indirildi. Dosya yüklenen görselleri de içerir.');
+}
+function downloadCsv(filename,columns,rows){
+  const safe=value=>{
+    const raw=String(value??'');
+    const guarded=/^[\s\t\r\n]*[=+\-@]/.test(raw)?"'"+raw:raw;
+    return '"'+guarded.replace(/"/g,'""')+'"';
+  };
+  const csv='\uFEFF'+[columns,...rows].map(row=>row.map(safe).join(';')).join('\r\n');
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  const link=document.createElement('a');link.href=url;link.download=filename;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function exportExcel(){
+  const list=visibleTasks(state).filter(t=>ui.reportMonth==='all'||t.createdAt?.startsWith(ui.reportMonth));
+  downloadCsv('gorsel-operasyon-is-sureleri.csv',['Firma','Görsel türü','İş','Çalışan','İş durumu','Oluşturulma','Teslim tarihi','Teslim süresi (saat)','Bekleme (saat)','Tasarım (saat)','Rapor sayısı'],list.map(t=>{
+    const m=taskDurations(t),hours=value=>value===null||m.approximate?'':(value/3600000).toLocaleString('tr-TR',{maximumFractionDigits:2});
+    return [t.company||'',VISUAL_TYPES[t.visualType]||'',t.title,user(t.assigneeId)?.name||'',STATUS_LABELS[t.status],t.createdAt||'',t.dueDate||'',hours(m.deliveryMs),hours(m.waitingMs),hours(m.designMs),ownReports().filter(r=>r.taskId===t.id).length];
+  }));
+  notify('Excel ile açılabilen CSV indirildi.');
+}
+function exportOffice(){
+  if(!officeAllowed())return notify('Ofis kayıtlarına erişim yetkin yok.',true);
+  const list=(state.officeEntries||[]).filter(item=>item.date.startsWith(ui.officeMonth));
+  downloadCsv('gorsel-operasyon-ofis-'+ui.officeMonth+'.csv',['Tarih','Tür','Kategori','Açıklama','Tutar (TRY)','Ekleyen'],list.map(item=>[item.date,item.kind==='income'?'Gelir':'Gider',item.category,item.description,item.amount.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}),user(item.byId)?.name||'']));
+  notify('Ofis kayıtları CSV olarak indirildi.');
 }
 
 document.addEventListener('click',async e=>{
@@ -219,7 +271,9 @@ document.addEventListener('click',async e=>{
     if(a==='remove-upload'){ui.formImages.splice(Number(el.dataset.index),1);$('#upload-list').innerHTML=uploadItems()}
     if(a==='toggle-task'){ui.taskForm=!ui.taskForm;render()}
     if(a==='toggle-shift'){ui.shiftForm=!ui.shiftForm;render()}
-    if(a==='start-task'||a==='finish-task')await dispatch({type:'setTaskStatus',taskId:el.dataset.id,status:a==='start-task'?'doing':'done'},a==='start-task'?'İş üretime alındı.':'İşin tamamlandığı bildirildi.');
+    if(a==='toggle-shift-event'){ui.shiftEventForm=!ui.shiftEventForm;render()}
+    if(a==='export-excel')exportExcel();
+    if(a==='export-office')exportOffice();
     if(a==='report-tab'){ui.reportStatus=el.dataset.value;render()}
     if(a==='archive-tab'){ui.archiveStatus=el.dataset.value;render()}
     if(a==='archive-preview'){const report=ownReports().find(x=>x.id===el.dataset.id),im=report?.images[Number(el.dataset.index)];if(im)showImage(im.src,im.name)}
@@ -237,6 +291,12 @@ document.addEventListener('change',async e=>{
     if(await dispatch({type:'switchUser',userId:el.value},'',{renderAfter:false})){ui.selectedId=null;ui.search='';ui.team='';ui.person='';ui.status='pending';ui.version='';ui.taskForm=false;ui.shiftForm=false;navigate(isManager()?'review':'tasks');notify('Demo rolü: '+roleNames[currentUser(state).role]);}
   }else if(['team','person','status'].includes(key)){ui[key]=el.value;ui.selectedId=null;ui.imageIndex=0;ui.version='';render()}
   else if(key==='version'){ui.version=el.value;ui.imageIndex=0;render()}
+  else if(key==='task-status')await dispatch({type:'setTaskStatus',taskId:el.dataset.id,status:el.value},'İş durumu güncellendi.');
+  else if(key==='shift-month'){ui.shiftMonth=el.value;render()}
+  else if(key==='report-month'){ui.reportMonth=el.value;render()}
+  else if(key==='office-month'){ui.officeMonth=el.value;render()}
+  else if(key==='office-kind'){$('#office-category').innerHTML=OFFICE_CATEGORIES[el.value].map(item=>'<option>'+esc(item)+'</option>').join('')}
+  else if(key==='event-kind'){const leave=el.value==='leave';document.querySelectorAll('.event-time').forEach(field=>{field.hidden=leave;field.querySelector('input').required=!leave})}
   if(el.id==='file-input')await addFiles(el.files);
 });
 document.addEventListener('input',e=>{
@@ -260,11 +320,14 @@ async function addFiles(files){
   finally{uploading=false;if($('#file-input')){$('#file-input').disabled=false;$('#file-input').value=''}}
 }
 document.addEventListener('submit',async e=>{
-  const form=e.target;if(!['report-form','task-form','shift-form'].includes(form.id))return;e.preventDefault();
+  const form=e.target;if(!['report-form','task-form','shift-form','monthly-shift-form','shift-event-form','office-form'].includes(form.id))return;e.preventDefault();
   const data=Object.fromEntries(new FormData(form));const submitter=e.submitter;submitter.disabled=true;
   try{
     if(form.id==='task-form'){if(await dispatch({type:'createTask',...data},'İş oluşturuldu.',{renderAfter:false})){ui.taskForm=false;render()}}
     if(form.id==='shift-form'){if(await dispatch({type:'createShift',...data},'Vardiya planlandı.',{renderAfter:false})){ui.shiftForm=false;render()}}
+    if(form.id==='monthly-shift-form'){const weekdays=[...form.querySelectorAll('[name="weekday"]:checked')].map(input=>Number(input.value));if(await dispatch({type:'createMonthlyShifts',...data,weekdays},'Aylık vardiya düzeni eklendi.',{renderAfter:false})){ui.shiftForm=false;ui.shiftMonth=data.month;render()}}
+    if(form.id==='shift-event-form'){if(await dispatch({type:'createShiftEvent',...data},'Mesai / izin kaydı eklendi.',{renderAfter:false})){ui.shiftEventForm=false;ui.shiftMonth=data.date.slice(0,7);render()}}
+    if(form.id==='office-form'){if(await dispatch({type:'createOfficeEntry',...data},'Ofis kaydı eklendi.',{renderAfter:false})){ui.officeMonth=data.date.slice(0,7);render()}}
     if(form.id==='report-form'){
       if(uploading){notify('Görsellerin eklenmesini bekle.',true);return}
       const send=submitter.value==='send';
@@ -282,6 +345,6 @@ window.addEventListener('beforeunload',e=>{if(ui.page==='form'){e.preventDefault
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&ui.navOpen){ui.navOpen=false;render()}});
 channel?.addEventListener('message',async()=>{if(ui.page==='form')return;try{const current=await readState();if(current){state=current;render();notify('Çalışma alanı diğer sekmedeki değişikliklerle güncellendi.')}}catch{}});
 try{
-  db=await openStorage();state=await readState();if(!state||state.version!==1)await replaceState(createInitialState());
+  db=await openStorage();state=await readState();const migrated=migrateState(state);if(!migrated)await replaceState(createInitialState());else if(migrated!==state)await replaceState(migrated);
 }catch(err){inMemory=true;state=createInitialState()}
 ui.page=isManager()?'review':'tasks';render();

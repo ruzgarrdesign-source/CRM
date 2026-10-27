@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createInitialState, currentUser, visibleReports, visibleTasks, visibleShifts, canReview, reduceState } from '../dist/domain.mjs';
+import { createInitialState, currentUser, visibleReports, visibleTasks, visibleShifts, canReview, canAccessOffice, migrateState, taskDurations, reduceState } from '../dist/domain.mjs';
 
 const act = (state, type, props = {}) => reduceState(state, { type, at: '2026-10-27T12:00:00.000Z', ...props });
 const as = (state, userId) => act(state, 'switchUser', { userId });
@@ -21,7 +21,7 @@ test('team lead cannot inspect or change another team', () => {
   assert.ok(!visibleReports(state).some(r => r.id === 'r3'));
   assert.equal(canReview(state, state.reports.find(r => r.id === 'r3')), false);
   assert.throws(() => act(state, 'decideReport', { reportId: 'r3', decision: 'approve', expectedRevision: 1 }), /yetkiniz/);
-  assert.throws(() => act(state, 'setTaskStatus', { taskId: 't3', status: 'done' }), /yetkiniz/);
+  assert.throws(() => act(state, 'setTaskStatus', { taskId: 't3', status: 'completed' }), /yetkiniz/);
   assert.throws(() => act(state, 'createTask', { title: 'Başka ekip', assigneeId: 'zeynep' }), /kendi ekibinize/);
 });
 
@@ -30,7 +30,7 @@ test('approval changes only report state and not task completion; repeated or st
   assert.throws(() => act(state, 'decideReport', { reportId: 'r1', decision: 'approve', expectedRevision: 0 }), /sürümü değişti/);
   const approved = act(state, 'decideReport', { reportId: 'r1', decision: 'approve', expectedRevision: 1 });
   assert.equal(approved.reports[0].status, 'approved');
-  assert.equal(approved.tasks[0].status, 'doing');
+  assert.equal(approved.tasks[0].status, 'design');
   assert.equal(state.reports[0].status, 'pending');
   assert.ok(approved.notifications.some(n => n.userId === 'ayse' && n.reportId === 'r1' && /onaylandı/.test(n.text)));
   assert.throws(() => act(approved, 'decideReport', { reportId: 'r1', decision: 'approve', expectedRevision: 1 }), /artık inceleme beklemiyor/);
@@ -115,4 +115,61 @@ test('notification read action affects only the current user', () => {
   const next = act(state, 'markNotificationsRead');
   assert.ok(next.notifications.filter(n => n.userId === 'ayse').every(n => n.read));
   assert.equal(next.notifications.find(n => n.userId === 'can').read, false);
+});
+
+test('work request requires firm and type; assigned employee controls status and measured time', () => {
+  const initial = createInitialState();
+  assert.throws(() => act(initial, 'createTask', { title: 'Yeni görsel', assigneeId: 'ayse' }), /Firma adı/);
+  assert.throws(() => act(initial, 'createTask', { title: 'Yeni görsel', company: 'Forma', visualType: 'banner', assigneeId: 'ayse' }), /Görsel türünü/);
+  let state = act(initial, 'createTask', { title: 'Maç duyurusu', company: 'Forma', visualType: 'match', assigneeId: 'ayse', dueDate: '2026-10-29' });
+  const id = state.tasks.at(-1).id;
+  assert.equal(state.tasks.at(-1).status, 'waiting');
+  state = as(state, 'ayse');
+  state = reduceState(state, { type: 'setTaskStatus', taskId: id, status: 'design', at: '2026-10-27T13:00:00.000Z' });
+  state = reduceState(state, { type: 'setTaskStatus', taskId: id, status: 'completed', at: '2026-10-27T15:00:00.000Z' });
+  assert.deepEqual(taskDurations(state.tasks.at(-1), '2026-10-27T16:00:00.000Z'), { deliveryMs: 3 * 3600000, waitingMs: 3600000, designMs: 2 * 3600000, approximate: false });
+  assert.throws(() => act(as(state, 'can'), 'setTaskStatus', { taskId: id, status: 'canceled' }), /yetkiniz/);
+});
+
+test('monthly schedule adds selected weekdays and records overtime and leave reasons', () => {
+  let state = createInitialState();
+  const before = state.shifts.length;
+  state = act(state, 'createMonthlyShifts', { userId: 'ayse', month: '2026-11', weekdays: [1, 3], start: '09:00', end: '18:00' });
+  const added = state.shifts.slice(before);
+  assert.ok(added.length >= 8);
+  assert.ok(added.every(item => [1, 3].includes(new Date(item.date + 'T12:00:00Z').getUTCDay())));
+  const repeated = act(state, 'createMonthlyShifts', { userId: 'ayse', month: '2026-11', weekdays: [1, 5], start: '09:00', end: '18:00' });
+  assert.ok(repeated.shifts.length > state.shifts.length);
+  assert.throws(() => act(state, 'createShiftEvent', { userId: 'ayse', kind: 'leave', date: '2026-11-05', reason: '' }), /nedeni/);
+  state = act(state, 'createShiftEvent', { userId: 'ayse', kind: 'leave', date: '2026-11-05', reason: 'Yıllık izin' });
+  state = act(state, 'createShiftEvent', { userId: 'ayse', kind: 'overtime', date: '2026-11-06', start: '18:00', end: '20:00', reason: 'Acil teslim' });
+  assert.deepEqual(state.shifts.slice(-2).map(item => item.reason), ['Yıllık izin', 'Acil teslim']);
+});
+
+test('office ledger is limited to system and operations managers', () => {
+  const initial = createInitialState();
+  const props = { kind: 'expense', date: '2026-10-27', amount: 250.50, category: 'Yazılım', description: 'Lisans' };
+  for (const id of ['ayse', 'lead']) {
+    const state = as(initial, id);
+    assert.equal(canAccessOffice(state), false);
+    assert.throws(() => act(state, 'createOfficeEntry', props), /yetkiniz/);
+  }
+  const result = act(initial, 'createOfficeEntry', props);
+  assert.equal(result.officeEntries.at(-1).amount, 250.5);
+  assert.throws(() => act(initial, 'createOfficeEntry', { ...props, amount: -1 }), /Tutar/);
+});
+
+test('version one browser records migrate without dropping user records', () => {
+  const old = createInitialState();
+  old.version = 1;
+  old.tasks[0].status = 'doing';
+  delete old.tasks[0].statusHistory;
+  delete old.tasks[0].company;
+  delete old.officeEntries;
+  const result = migrateState(old);
+  assert.equal(result.version, 3);
+  assert.equal(result.tasks[0].status, 'design');
+  assert.equal(result.tasks[0].timingApproximate, true);
+  assert.equal(result.reports.length, old.reports.length);
+  assert.equal(result.officeEntries.length, 2);
 });

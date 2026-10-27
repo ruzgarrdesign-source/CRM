@@ -97,6 +97,8 @@ The shipped Operate prototype makes the report image and the review decision the
 
 The interface uses ordinary controls and aligned metadata. The contact strip tracks the selected image below the viewer; report state remains readable in words and color. The visual system describes this browser-local demo, not a settled product brand.
 
+The operations extension keeps the same restrained workbench language. The Reports page uses aligned duration bars and explicit units; the monthly shift calendar pairs compact labels with a detailed ledger below it. The Office ledger uses the existing white panels and role-scoped navigation. The review screen's three-area composition remains unchanged.
+
 **Key Characteristics:**
 
 - Desktop-first, three-area review workspace.

@@ -4,7 +4,12 @@
  */
 export const STATUS_LABELS = Object.freeze({
   draft: 'Taslak', pending: 'İncelemede', revision: 'Revizyon istendi', approved: 'Onaylandı',
-  todo: 'Başlanmadı', doing: 'Devam ediyor', done: 'Tamamlandı',
+  waiting: 'Beklemede', design: 'Tasarım aşamasında', canceled: 'İptal', completed: 'Tamamlandı',
+});
+export const VISUAL_TYPES = Object.freeze({ social: 'Sosyal', match: 'Maç', site: 'Site', full_package: 'Full Paket' });
+export const OFFICE_CATEGORIES = Object.freeze({
+  income: ['Müşteri ödemesi', 'Diğer gelir'],
+  expense: ['Kira', 'Personel', 'Yazılım', 'Ekipman', 'Vergi', 'Diğer gider'],
 });
 
 const clone = value => structuredClone(value);
@@ -14,6 +19,7 @@ const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key
 const now = action => action.at || new Date().toISOString();
 const elevated = user => ['admin', 'operations_manager'].includes(user?.role);
 const manager = user => elevated(user) || user?.role === 'team_lead';
+export const canAccessOffice = state => elevated(currentUser(state));
 const idFor = (items, prefix) => {
   const taken = new Set(items.map(item => item.id));
   let number = items.length + 1;
@@ -45,6 +51,65 @@ export function visibleTasks(state) {
 export function visibleShifts(state) {
   const user = currentUser(state);
   return state.shifts.filter(shift => visibleTo(user, shift, 'userId'));
+}
+
+export function taskDurations(task, asOf = new Date().toISOString()) {
+  const history = (task.statusHistory || []).slice().sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  if (!history.length || task.timingApproximate) return { deliveryMs: null, waitingMs: null, designMs: null, approximate: true };
+  let waitingMs = 0, designMs = 0;
+  const end = Math.max(Date.parse(asOf), Date.parse(history.at(-1).at));
+  for (let i = 0; i < history.length; i++) {
+    const from = Date.parse(history[i].at);
+    const to = i + 1 < history.length ? Date.parse(history[i + 1].at) : end;
+    const duration = Math.max(0, to - from);
+    if (history[i].status === 'waiting') waitingMs += duration;
+    if (history[i].status === 'design') designMs += duration;
+  }
+  const completed = history.findLast(item => item.status === 'completed');
+  return { deliveryMs: completed ? Math.max(0, Date.parse(completed.at) - Date.parse(task.createdAt)) : null,
+    waitingMs, designMs, approximate: false };
+}
+
+export function migrateState(saved) {
+  if (!saved || saved.version === 3) return saved;
+  if (saved.version === 2) {
+    const next = clone(saved);
+    const originalTypes = { t1: ['Forma', 'social'], t2: ['Atölye', 'site'], t3: ['Rota', 'match'],
+      t4: ['Forma', 'full_package'], t5: ['Atölye', 'social'], t6: ['Rota', 'full_package'] };
+    next.tasks = next.tasks.map(task => {
+      const original = originalTypes[task.id];
+      const seeded = original && task.title.startsWith(`${original[0]} · `);
+      return seeded ? { ...task, company: task.company || original[0], visualType: task.visualType || original[1] } : task;
+    });
+    if (!next.officeEntries?.length && next.tasks.some(task => originalTypes[task.id])) {
+      const date = new Date().toISOString().slice(0, 10), at = new Date().toISOString();
+      next.officeEntries = [
+        { id: 'o1', kind: 'income', date, amount: 18000, category: 'Müşteri ödemesi', description: 'Örnek aylık proje ödemesi', createdAt: at, byId: 'manager' },
+        { id: 'o2', kind: 'expense', date, amount: 3600, category: 'Yazılım', description: 'Örnek yazılım gideri', createdAt: at, byId: 'manager' },
+      ];
+    }
+    next.version = 3;
+    return next;
+  }
+  if (saved.version !== 1) return null;
+  const next = clone(saved);
+  const statusMap = { todo: 'waiting', doing: 'design', done: 'completed' };
+  const originalTypes = { t1: ['Forma', 'social'], t2: ['Atölye', 'site'], t3: ['Rota', 'match'],
+    t4: ['Forma', 'full_package'], t5: ['Atölye', 'social'], t6: ['Rota', 'full_package'] };
+  next.tasks = (next.tasks || []).map(task => {
+    const createdAt = next.reports?.filter(report => report.taskId === task.id)
+      .map(report => report.createdAt).sort()[0] || new Date().toISOString();
+    const original = originalTypes[task.id];
+    const seeded = original && task.title.startsWith(`${original[0]} · `);
+    return { ...task, company: task.company || (seeded ? original[0] : ''), visualType: task.visualType || (seeded ? original[1] : ''),
+      status: statusMap[task.status] || task.status, createdAt,
+      statusHistory: [{ status: statusMap[task.status] || task.status, at: createdAt, byId: 'migration' }],
+      timingApproximate: true };
+  });
+  next.shifts = (next.shifts || []).map(shift => ({ kind: 'shift', reason: '', ...shift }));
+  next.officeEntries ||= [];
+  next.version = 2;
+  return migrateState(next);
 }
 
 export function canReview(state, report) {
@@ -196,8 +261,11 @@ export function reduceState(state, action) {
     case 'setTaskStatus': {
       const task = next.tasks.find(item => item.id === action.taskId);
       if (!task || !visibleTo(user, task, 'assigneeId')) fail('Bu işi değiştirme yetkiniz yok.');
-      if (!['todo', 'doing', 'done'].includes(action.status)) fail('İş durumu geçersiz.');
+      if (!['waiting', 'design', 'canceled', 'completed'].includes(action.status)) fail('İş durumu geçersiz.');
+      if (task.status === action.status) return next;
       task.status = action.status;
+      task.statusHistory ||= [];
+      task.statusHistory.push({ status: action.status, at, byId: user.id });
       return next;
     }
     case 'createTask': {
@@ -207,10 +275,14 @@ export function reduceState(state, action) {
       if (!elevated(user) && assignee.teamId !== user.teamId) fail('Yalnızca kendi ekibinize iş atayabilirsiniz.');
       const title = text(action.title);
       if (!title || title.length > 180) fail('İş başlığı 1–180 karakter olmalıdır.');
+      const company = text(action.company);
+      if (!company || company.length > 120) fail('Firma adı 1–120 karakter olmalıdır.');
+      if (!hasOwn(VISUAL_TYPES, action.visualType)) fail('Görsel türünü seçin.');
       const dueDate = text(action.dueDate);
       if (dueDate && !validDate(dueDate)) fail('Teslim tarihi geçersiz.');
       next.tasks.push({ id: idFor(next.tasks, 't'), title, description: text(action.description),
-        assigneeId: assignee.id, teamId: assignee.teamId, status: 'todo', dueDate });
+        company, visualType: action.visualType, assigneeId: assignee.id, teamId: assignee.teamId,
+        status: 'waiting', dueDate, createdAt: at, statusHistory: [{ status: 'waiting', at, byId: user.id }] });
       return next;
     }
     case 'createShift': {
@@ -224,7 +296,57 @@ export function reduceState(state, action) {
         fail('Bu çalışanın aynı saatlerle çakışan bir vardiyası var.');
       }
       next.shifts.push({ id: idFor(next.shifts, 's'), userId: member.id, teamId: member.teamId,
-        date: action.date, start: action.start, end: action.end });
+        date: action.date, start: action.start, end: action.end, kind: 'shift', reason: '' });
+      return next;
+    }
+    case 'createMonthlyShifts': {
+      if (!manager(user)) fail('Vardiya planlama yetkiniz yok.');
+      const member = next.users.find(item => item.id === action.userId);
+      if (!member?.teamId || (!elevated(user) && member.teamId !== user.teamId)) fail('Bu çalışan için vardiya planlayamazsınız.');
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(action.month || '') || !validTime(action.start) || !validTime(action.end) || action.end <= action.start) fail('Ay veya vardiya saatleri geçersiz.');
+      const weekdays = [...new Set(action.weekdays || [])].map(Number);
+      if (!weekdays.length || weekdays.some(day => !Number.isInteger(day) || day < 0 || day > 6)) fail('En az bir geçerli hafta günü seçin.');
+      const [year, month] = action.month.split('-').map(Number);
+      const days = new Date(Date.UTC(year, month, 0)).getUTCDate();
+      const proposed = [];
+      for (let day = 1; day <= days; day++) {
+        const date = `${action.month}-${String(day).padStart(2, '0')}`;
+        if (!weekdays.includes(new Date(`${date}T12:00:00Z`).getUTCDay())) continue;
+        const overlap = next.shifts.some(shift => shift.userId === member.id && shift.date === date &&
+          (shift.kind === 'leave' || (action.start < shift.end && action.end > shift.start)));
+        if (!overlap) proposed.push(date);
+      }
+      if (!proposed.length) fail('Bu ay için eklenebilecek boş vardiya bulunamadı.');
+      for (const date of proposed) next.shifts.push({ id: idFor(next.shifts, 's'), userId: member.id, teamId: member.teamId,
+        date, start: action.start, end: action.end, kind: 'shift', reason: '' });
+      return next;
+    }
+    case 'createShiftEvent': {
+      if (!manager(user)) fail('Mesai veya izin kaydı ekleme yetkiniz yok.');
+      const member = next.users.find(item => item.id === action.userId);
+      if (!member?.teamId || (!elevated(user) && member.teamId !== user.teamId)) fail('Bu çalışan için kayıt ekleyemezsiniz.');
+      if (!['overtime', 'leave'].includes(action.kind) || !validDate(action.date)) fail('Kayıt türü veya tarih geçersiz.');
+      const reason = text(action.reason);
+      if (!reason || reason.length > 500) fail('Mesai veya izin nedeni 1–500 karakter olmalıdır.');
+      const start = action.kind === 'overtime' ? action.start : '';
+      const end = action.kind === 'overtime' ? action.end : '';
+      if (action.kind === 'overtime' && (!validTime(start) || !validTime(end) || end <= start)) fail('Ek mesai saatleri aynı gün içinde ve geçerli olmalıdır.');
+      if (action.kind === 'leave' && next.shifts.some(shift => shift.userId === member.id && shift.date === action.date && shift.kind === 'leave')) fail('Bu gün için izin kaydı zaten var.');
+      next.shifts.push({ id: idFor(next.shifts, 's'), userId: member.id, teamId: member.teamId, date: action.date,
+        start, end, kind: action.kind, reason });
+      return next;
+    }
+    case 'createOfficeEntry': {
+      if (!elevated(user)) fail('Ofis paneline erişim yetkiniz yok.');
+      if (!['income', 'expense'].includes(action.kind) || !validDate(action.date)) fail('Gelir/gider türü veya tarih geçersiz.');
+      const amount = Number(action.amount);
+      if (!Number.isFinite(amount) || amount <= 0 || amount > 100000000) fail('Tutar pozitif ve geçerli olmalıdır.');
+      const category = text(action.category), description = text(action.description);
+      if (!OFFICE_CATEGORIES[action.kind].includes(category)) fail('Geçerli bir kategori seçin.');
+      if (!description || description.length > 500) fail('Açıklama 1–500 karakter olmalıdır.');
+      next.officeEntries ||= [];
+      next.officeEntries.push({ id: idFor(next.officeEntries, 'o'), kind: action.kind, date: action.date,
+        amount: Math.round(amount * 100) / 100, category, description, createdAt: at, byId: user.id });
       return next;
     }
     case 'markNotificationsRead': {
@@ -248,14 +370,20 @@ export function createInitialState() {
     { id: 'zeynep', name: 'Zeynep Arslan', role: 'employee', teamId: 'motion', initials: 'ZA' },
   ];
   const tasks = [
-    { id: 't1', title: 'Forma · Sosyal medya serisi', description: 'Yeni sezon için üç kare görsel. Başlık okunaklı, yerleşim seri boyunca tutarlı olmalı. Bu iş ve içerikler demo amaçlıdır.', assigneeId: 'ayse', teamId: 'design', status: 'doing', dueDate: day },
-    { id: 't2', title: 'Atölye · Etkinlik afişi', description: 'Dijital etkinlik afişinin ana kompozisyonu ve alternatif renk uygulaması. Demo çalışma.', assigneeId: 'can', teamId: 'design', status: 'doing', dueDate: day },
-    { id: 't3', title: 'Rota · Kampanya görseli', description: 'Kampanya duyurusu için statik ana görsel. Başlık ve kısa mesajı birlikte kontrol edin. Demo çalışma.', assigneeId: 'zeynep', teamId: 'motion', status: 'doing', dueDate: day },
-    { id: 't4', title: 'Forma · Dikey uyarlama', description: 'Onaylı ana fikrin dikey formata uyarlanması. Başlık güvenli alanını koruyun. Demo çalışma.', assigneeId: 'ayse', teamId: 'design', status: 'doing', dueDate: day },
-    { id: 't5', title: 'Atölye · Duyuru görseli', description: 'Etkinlik duyurusu için kare format. Demo çalışma.', assigneeId: 'can', teamId: 'design', status: 'done', dueDate: day },
-    { id: 't6', title: 'Rota · Yeni seri hazırlığı', description: 'Bir sonraki görsel serisi için iki kompozisyon hazırlayın. Demo çalışma.', assigneeId: 'ayse', teamId: 'design', status: 'todo', dueDate: day },
+    { id: 't1', company: 'Forma', visualType: 'social', title: 'Sosyal medya serisi', description: 'Yeni sezon için üç kare görsel. Başlık okunaklı, yerleşim seri boyunca tutarlı olmalı. Demo iş.', assigneeId: 'ayse', teamId: 'design', status: 'design', dueDate: day },
+    { id: 't2', company: 'Atölye', visualType: 'site', title: 'Etkinlik afişi', description: 'Dijital etkinlik afişinin ana kompozisyonu ve alternatif renk uygulaması. Demo iş.', assigneeId: 'can', teamId: 'design', status: 'design', dueDate: day },
+    { id: 't3', company: 'Rota', visualType: 'match', title: 'Kampanya görseli', description: 'Kampanya duyurusu için statik ana görsel. Demo iş.', assigneeId: 'zeynep', teamId: 'motion', status: 'design', dueDate: day },
+    { id: 't4', company: 'Forma', visualType: 'full_package', title: 'Dikey uyarlama', description: 'Onaylı ana fikrin dikey formata uyarlanması. Demo iş.', assigneeId: 'ayse', teamId: 'design', status: 'design', dueDate: day },
+    { id: 't5', company: 'Atölye', visualType: 'social', title: 'Duyuru görseli', description: 'Etkinlik duyurusu için kare format. Demo iş.', assigneeId: 'can', teamId: 'design', status: 'completed', dueDate: day },
+    { id: 't6', company: 'Rota', visualType: 'full_package', title: 'Yeni seri hazırlığı', description: 'Bir sonraki görsel serisi için iki kompozisyon hazırlayın. Demo iş.', assigneeId: 'ayse', teamId: 'design', status: 'waiting', dueDate: day },
   ];
-  const shifts = users.map((user, index) => ({ id: `s${index + 1}`, userId: user.id, teamId: user.teamId, date: day, start: '09:00', end: '18:00' }));
+  for (const task of tasks) {
+    task.createdAt = stamp('08:00');
+    task.statusHistory = [{ status: 'waiting', at: stamp('08:00'), byId: 'manager' }];
+    if (task.status === 'design' || task.status === 'completed') task.statusHistory.push({ status: 'design', at: stamp('08:40'), byId: task.assigneeId });
+    if (task.status === 'completed') task.statusHistory.push({ status: 'completed', at: stamp('09:35'), byId: task.assigneeId });
+  }
+  const shifts = users.map((user, index) => ({ id: `s${index + 1}`, userId: user.id, teamId: user.teamId, date: day, start: '09:00', end: '18:00', kind: 'shift', reason: '' }));
   const image = (n, id) => ({ id, name: `demo-${String(n).padStart(2, '0')}.svg`, src: `assets/demo-${String(n).padStart(2, '0')}.svg`, type: 'image/svg+xml', size: 2400 + n * 400 });
   const definitions = [
     { id: 'r1', taskId: 't1', authorId: 'ayse', status: 'pending', hour: '10:15', note: 'Ana kompozisyon ve iki renk uygulaması hazır. Seri tutarlılığı ve metin okunabilirliği için kontrol rica ederim.', images: [image(1, 'i11'), image(2, 'i12'), image(3, 'i13')] },
@@ -281,8 +409,11 @@ export function createInitialState() {
     if (definition.status === 'approved') report.history.push({ id: 'h3', byId: 'manager', action: 'approved', text: 'Raporun 1. sürümü onaylandı.', at: stamp('09:35') });
     return report;
   });
-  return { version: 1, currentUserId: 'manager', users, teams: [{ id: 'design', name: 'Tasarım ekibi' }, { id: 'motion', name: 'İçerik ekibi' }],
-    tasks, shifts, reports, notifications: [
+  return { version: 3, currentUserId: 'manager', users, teams: [{ id: 'design', name: 'Tasarım ekibi' }, { id: 'motion', name: 'İçerik ekibi' }],
+    tasks, shifts, reports, officeEntries: [
+      { id: 'o1', kind: 'income', date: day, amount: 18000, category: 'Müşteri ödemesi', description: 'Örnek aylık proje ödemesi', createdAt: stamp('10:00'), byId: 'manager' },
+      { id: 'o2', kind: 'expense', date: day, amount: 3600, category: 'Yazılım', description: 'Örnek yazılım gideri', createdAt: stamp('10:10'), byId: 'manager' },
+    ], notifications: [
       { id: 'n1', userId: 'ayse', text: '“Forma · Dikey uyarlama” raporunuz için revizyon istendi.', reportId: 'r4', read: false, at: stamp('10:00') },
       { id: 'n2', userId: 'can', text: '“Atölye · Duyuru görseli” raporunuz onaylandı.', reportId: 'r5', read: false, at: stamp('09:35') },
       { id: 'n3', userId: 'manager', text: 'İncelemenizi bekleyen üç demo rapor bulunuyor.', reportId: 'r1', read: false, at: stamp('11:05') },
