@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">STÜDYO — Az, ama öz. Örnek yatay tasarım.</title>
+  <desc id="desc">Limon yeşili zemin üzerinde lacivert tipografi ve birbirine hizalanmış dikdörtgenlerden oluşan kurgusal editoryal tasarım.</desc>
+  <rect width="1200" height="900" fill="#d7ee91"/>
+  <g font-family="Arial, sans-serif" fill="#182e44">
+    <text x="70" y="110" font-size="48" font-weight="700" letter-spacing="-1">STÜDYO</text>
+    <text x="64" y="354" font-size="170" font-weight="700" letter-spacing="-5">Az, ama</text>
+    <text x="64" y="524" font-size="170" font-weight="700" letter-spacing="-5">öz.</text>
+    <text x="72" y="624" font-size="30">Daha az detay. Daha açık bir fikir.</text>
+  </g>
+  <rect x="830" y="225" width="300" height="420" fill="#182e44"/>
+  <rect x="870" y="265" width="220" height="340" fill="#d7ee91"/>
+  <rect x="910" y="305" width="140" height="260" fill="#182e44"/>
+  <rect x="70" y="710" width="1060" height="48" fill="#182e44"/>
+  <rect x="730" y="710" width="70" height="48" fill="#d7ee91"/>
+  <text x="70" y="842" font-family="Arial, sans-serif" fill="#182e44" font-size="19" font-weight="700" letter-spacing="1.5">ÖRNEK TASARIM • DEMO</text>
+</svg>

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" role="img" aria-labelledby="title desc">
+  <title id="title">Birlikte üret. Örnek kare tasarım.</title>
+  <desc id="desc">Kobalt mavisi zemin, şeftali rengi tipografi ve birbirine yaklaşan iki geometrik daireyle hazırlanmış kurgusal kampanya tasarımı.</desc>
+  <rect width="1080" height="1080" fill="#3b5ce2"/>
+  <g font-family="Arial, sans-serif" fill="#f7c2a2">
+    <text x="60" y="225" font-size="148" font-weight="700" letter-spacing="-4">Birlikte</text>
+    <text x="60" y="375" font-size="148" font-weight="700" letter-spacing="-4">üret.</text>
+    <text x="67" y="458" font-size="29">Bir fikir, farklı bakışlar.</text>
+  </g>
+  <circle cx="350" cy="740" r="185" fill="#f7c2a2"/>
+  <circle cx="730" cy="740" r="185" fill="#f7c2a2"/>
+  <rect x="350" y="555" width="380" height="370" fill="#f7c2a2"/>
+  <rect x="518" y="555" width="44" height="370" fill="#3b5ce2"/>
+  <path d="M67 987H1013" fill="none" stroke="#f7c2a2" stroke-width="1.5"/>
+  <text x="67" y="1040" font-family="Arial, sans-serif" fill="#f7c2a2" font-size="19" font-weight="700" letter-spacing="1.5">ÖRNEK TASARIM • DEMO</text>
+</svg>

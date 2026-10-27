@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350" role="img" aria-labelledby="title desc">
+  <title id="title">FORMA — Gününe alan aç. Örnek dikey tasarım.</title>
+  <desc id="desc">Kayısı zemin üzerinde koyu mavi tipografi, mercan renkli bir daire ve mavi dikdörtgenlerle hazırlanmış kurgusal sosyal medya tasarımı.</desc>
+  <rect width="1080" height="1350" fill="#f4b18a"/>
+  <g font-family="Arial, sans-serif" fill="#243b75">
+    <text x="70" y="110" font-size="48" font-weight="700" letter-spacing="-1">FORMA</text>
+    <text x="62" y="335" font-size="154" font-weight="700" letter-spacing="-4">Gününe</text>
+    <text x="62" y="490" font-size="154" font-weight="700" letter-spacing="-4">alan aç.</text>
+  </g>
+  <rect x="70" y="600" width="415" height="565" fill="#243b75"/>
+  <rect x="530" y="905" width="480" height="260" fill="#e66b45"/>
+  <circle cx="768" cy="752" r="215" fill="#e66b45"/>
+  <circle cx="768" cy="752" r="112" fill="#f4b18a"/>
+  <rect x="530" y="1017" width="480" height="35" fill="#243b75"/>
+  <g font-family="Arial, sans-serif" fill="#243b75">
+    <text x="70" y="1230" font-size="28">Düşün. Sadeleştir. Yeniden başla.</text>
+    <text x="70" y="1300" font-size="19" font-weight="700" letter-spacing="1.5">ÖRNEK TASARIM • DEMO</text>
+  </g>
+</svg>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">FORMA — Yeni bir ritim. Örnek yatay tasarım.</title>
+  <desc id="desc">Kiremit ve kayısı renkleri üzerinde büyük siyah tipografi ile üst üste gelen dairelerden oluşan kurgusal bir kampanya posteri.</desc>
+  <rect width="1200" height="900" fill="#e66b45"/>
+  <rect x="0" y="670" width="1200" height="230" fill="#f4b18a"/>
+  <circle cx="970" cy="514" r="270" fill="#f4b18a"/>
+  <circle cx="970" cy="514" r="170" fill="#e66b45"/>
+  <circle cx="905" cy="610" r="121" fill="#242e35"/>
+  <g font-family="Arial, sans-serif" fill="#242e35">
+    <text x="70" y="100" font-size="48" font-weight="700" letter-spacing="-1">FORMA</text>
+    <text x="65" y="330" font-size="170" font-weight="700" letter-spacing="-5">Yeni bir</text>
+    <text x="65" y="500" font-size="170" font-weight="700" letter-spacing="-5">ritim.</text>
+    <text x="70" y="745" font-size="31">Gündelik hayata yeni bir bakış.</text>
+    <text x="70" y="842" font-size="19" font-weight="700" letter-spacing="1.5">ÖRNEK TASARIM • DEMO</text>
+  </g>
+  <path d="M70 785H1130" fill="none" stroke="#242e35" stroke-width="1.5"/>
+</svg>

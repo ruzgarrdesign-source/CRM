@@ -1,0 +1,393 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-27T10:11:29Z",
+  "title": "Design System: Görsel Operasyon",
+  "extensions": {
+    "colorMeta": {
+      "nav": {
+        "role": "secondary",
+        "displayName": "Dark teal rail",
+        "canonical": "#173d3a",
+        "tonalRamp": [
+          "oklch(15% 0.018 175)",
+          "oklch(26% 0.035 175)",
+          "oklch(38% 0.035 175)",
+          "oklch(50% 0.035 175)",
+          "oklch(62% 0.035 175)",
+          "oklch(74% 0.035 175)",
+          "oklch(85% 0.035 175)",
+          "oklch(95% 0.018 175)"
+        ]
+      },
+      "nav-hover": {
+        "role": "secondary",
+        "displayName": "Rail hover",
+        "canonical": "#244e4a",
+        "tonalRamp": [
+          "oklch(15% 0.018 174)",
+          "oklch(26% 0.035 174)",
+          "oklch(38% 0.035 174)",
+          "oklch(50% 0.035 174)",
+          "oklch(62% 0.035 174)",
+          "oklch(74% 0.035 174)",
+          "oklch(85% 0.035 174)",
+          "oklch(95% 0.018 174)"
+        ]
+      },
+      "nav-text": {
+        "role": "secondary",
+        "displayName": "Rail text",
+        "canonical": "#d5e4df",
+        "tonalRamp": [
+          "oklch(15% 0.018 160)",
+          "oklch(26% 0.035 160)",
+          "oklch(38% 0.035 160)",
+          "oklch(50% 0.035 160)",
+          "oklch(62% 0.035 160)",
+          "oklch(74% 0.035 160)",
+          "oklch(85% 0.035 160)",
+          "oklch(95% 0.018 160)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#253b39",
+        "tonalRamp": [
+          "oklch(15% 0.003 175)",
+          "oklch(26% 0.006 175)",
+          "oklch(38% 0.006 175)",
+          "oklch(50% 0.006 175)",
+          "oklch(62% 0.006 175)",
+          "oklch(74% 0.006 175)",
+          "oklch(85% 0.006 175)",
+          "oklch(95% 0.003 175)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted gray-green",
+        "canonical": "#657572",
+        "tonalRamp": [
+          "oklch(15% 0.003 169)",
+          "oklch(26% 0.006 169)",
+          "oklch(38% 0.006 169)",
+          "oklch(50% 0.006 169)",
+          "oklch(62% 0.006 169)",
+          "oklch(74% 0.006 169)",
+          "oklch(85% 0.006 169)",
+          "oklch(95% 0.003 169)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Hairline border",
+        "canonical": "#e1e7e3",
+        "tonalRamp": [
+          "oklch(15% 0.003 140)",
+          "oklch(26% 0.006 140)",
+          "oklch(38% 0.006 140)",
+          "oklch(50% 0.006 140)",
+          "oklch(62% 0.006 140)",
+          "oklch(74% 0.006 140)",
+          "oklch(85% 0.006 140)",
+          "oklch(95% 0.003 140)"
+        ]
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Cool ground",
+        "canonical": "#f5f7f5",
+        "tonalRamp": [
+          "oklch(15% 0.003 120)",
+          "oklch(26% 0.006 120)",
+          "oklch(38% 0.006 120)",
+          "oklch(50% 0.006 120)",
+          "oklch(62% 0.006 120)",
+          "oklch(74% 0.006 120)",
+          "oklch(85% 0.006 120)",
+          "oklch(95% 0.003 120)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#fff",
+        "tonalRamp": [
+          "oklch(15% 0.003 0)",
+          "oklch(26% 0.006 0)",
+          "oklch(38% 0.006 0)",
+          "oklch(50% 0.006 0)",
+          "oklch(62% 0.006 0)",
+          "oklch(74% 0.006 0)",
+          "oklch(85% 0.006 0)",
+          "oklch(95% 0.003 0)"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Deep teal action",
+        "canonical": "#255e4f",
+        "tonalRamp": [
+          "oklch(15% 0.018 164)",
+          "oklch(26% 0.035 164)",
+          "oklch(38% 0.035 164)",
+          "oklch(50% 0.035 164)",
+          "oklch(62% 0.035 164)",
+          "oklch(74% 0.035 164)",
+          "oklch(85% 0.035 164)",
+          "oklch(95% 0.018 164)"
+        ]
+      },
+      "accent-hover": {
+        "role": "primary",
+        "displayName": "Action hover",
+        "canonical": "#194638",
+        "tonalRamp": [
+          "oklch(15% 0.018 161)",
+          "oklch(26% 0.035 161)",
+          "oklch(38% 0.035 161)",
+          "oklch(50% 0.035 161)",
+          "oklch(62% 0.035 161)",
+          "oklch(74% 0.035 161)",
+          "oklch(85% 0.035 161)",
+          "oklch(95% 0.018 161)"
+        ]
+      },
+      "mint": {
+        "role": "secondary",
+        "displayName": "Mint wash",
+        "canonical": "#e8f0e8",
+        "tonalRamp": [
+          "oklch(15% 0.018 120)",
+          "oklch(26% 0.035 120)",
+          "oklch(38% 0.035 120)",
+          "oklch(50% 0.035 120)",
+          "oklch(62% 0.035 120)",
+          "oklch(74% 0.035 120)",
+          "oklch(85% 0.035 120)",
+          "oklch(95% 0.018 120)"
+        ]
+      },
+      "green": {
+        "role": "secondary",
+        "displayName": "Approval green",
+        "canonical": "#286347",
+        "tonalRamp": [
+          "oklch(15% 0.018 152)",
+          "oklch(26% 0.035 152)",
+          "oklch(38% 0.035 152)",
+          "oklch(50% 0.035 152)",
+          "oklch(62% 0.035 152)",
+          "oklch(74% 0.035 152)",
+          "oklch(85% 0.035 152)",
+          "oklch(95% 0.018 152)"
+        ]
+      },
+      "amber": {
+        "role": "secondary",
+        "displayName": "Pending amber",
+        "canonical": "#895b1e",
+        "tonalRamp": [
+          "oklch(15% 0.018 34)",
+          "oklch(26% 0.035 34)",
+          "oklch(38% 0.035 34)",
+          "oklch(50% 0.035 34)",
+          "oklch(62% 0.035 34)",
+          "oklch(74% 0.035 34)",
+          "oklch(85% 0.035 34)",
+          "oklch(95% 0.018 34)"
+        ]
+      },
+      "red": {
+        "role": "secondary",
+        "displayName": "Error red",
+        "canonical": "#a03936",
+        "tonalRamp": [
+          "oklch(15% 0.018 2)",
+          "oklch(26% 0.035 2)",
+          "oklch(38% 0.035 2)",
+          "oklch(50% 0.035 2)",
+          "oklch(62% 0.035 2)",
+          "oklch(74% 0.035 2)",
+          "oklch(85% 0.035 2)",
+          "oklch(95% 0.018 2)"
+        ]
+      },
+      "blue": {
+        "role": "secondary",
+        "displayName": "Progress blue",
+        "canonical": "#355b85",
+        "tonalRamp": [
+          "oklch(15% 0.018 212)",
+          "oklch(26% 0.035 212)",
+          "oklch(38% 0.035 212)",
+          "oklch(50% 0.035 212)",
+          "oklch(62% 0.035 212)",
+          "oklch(74% 0.035 212)",
+          "oklch(85% 0.035 212)",
+          "oklch(95% 0.018 212)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Page headline",
+        "purpose": "Primary page title."
+      },
+      "section": {
+        "displayName": "Section heading",
+        "purpose": "Pane and section heading."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Interface copy."
+      },
+      "control": {
+        "displayName": "Control",
+        "purpose": "Button and field labels."
+      },
+      "metadata": {
+        "displayName": "Metadata",
+        "purpose": "Times, file names and counts."
+      }
+    },
+    "shadows": [
+      {
+        "name": "image",
+        "value": "0 6px 24px #18302714",
+        "purpose": "Quiet separation of viewed artwork from image mat."
+      },
+      {
+        "name": "floating",
+        "value": "0 12px 40px #183c3a20",
+        "purpose": "Toast and lightbox."
+      }
+    ],
+    "motion": [
+      {
+        "name": "control-state",
+        "value": "background .16s, color .16s, border-color .16s",
+        "purpose": "Interactive control state transitions."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "transition: none",
+        "purpose": "Applied when prefers-reduced-motion is reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide",
+        "value": "1500px"
+      },
+      {
+        "name": "compact",
+        "value": "1240px"
+      },
+      {
+        "name": "rail",
+        "value": "1080px"
+      },
+      {
+        "name": "split",
+        "value": "850px"
+      },
+      {
+        "name": "mobile",
+        "value": "600px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main review or form action.",
+      "html": "<button class=\"ds-btn-primary\">Raporu onayla</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:9px 13px;border:0;border-radius:6px;background:var(--accent,#255e4f);color:#fff;font:600 12px/1.5 'Segoe UI',Arial,sans-serif;cursor:pointer;transition:background .16s}.ds-btn-primary:hover{background:var(--accent-hover,#194638)}.ds-btn-primary:focus-visible{outline:3px solid #499a86;outline-offset:3px}.ds-btn-primary:disabled{opacity:.48;cursor:not-allowed}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Less prominent review or navigation action.",
+      "html": "<button class=\"ds-btn-secondary\">Revizyon iste</button>",
+      "css": ".ds-btn-secondary{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:9px 13px;border:1px solid #cbd6ce;border-radius:6px;background:#fff;color:#3b544b;font:600 12px/1.5 'Segoe UI',Arial,sans-serif;cursor:pointer;transition:background .16s}.ds-btn-secondary:hover{background:#eff4ef}.ds-btn-secondary:focus-visible{outline:3px solid #499a86;outline-offset:3px}"
+    },
+    {
+      "name": "Navigation Item",
+      "kind": "nav",
+      "refersTo": "nav-active",
+      "description": "Selected rail destination.",
+      "html": "<nav class=\"ds-nav\"><button class=\"ds-nav-item\">İnceleme</button></nav>",
+      "css": ".ds-nav{width:204px;padding:16px;background:var(--nav,#173d3a)}.ds-nav-item{width:100%;padding:11px 13px;border:0;border-radius:7px;background:#dce8da;color:#193d33;text-align:left;font:600 13px/1.5 'Segoe UI',Arial,sans-serif;cursor:pointer}.ds-nav-item:hover{background:#edf3e9}.ds-nav-item:focus-visible{outline:3px solid #499a86;outline-offset:3px}"
+    },
+    {
+      "name": "Pending Status",
+      "kind": "chip",
+      "refersTo": "status-pending",
+      "description": "Text and dot status for a submitted report.",
+      "html": "<span class=\"ds-pill-pending\">İncelemede</span>",
+      "css": ".ds-pill-pending{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border-radius:4px;background:#fbf1db;color:var(--amber,#895b1e);font:500 10px/1.4 'Segoe UI',Arial,sans-serif;white-space:nowrap}.ds-pill-pending:before{content:'';width:4px;height:4px;border-radius:50%;background:currentColor}"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "White bordered working surface.",
+      "html": "<section class=\"ds-panel\"><h2>Rapor bilgileri</h2><p>Rapor ayrıntıları</p></section>",
+      "css": ".ds-panel{padding:25px;border:1px solid var(--border,#e1e7e3);border-radius:10px;background:var(--paper,#fff);color:var(--ink,#253b39);font:14px/1.5 'Segoe UI',Arial,sans-serif}.ds-panel h2{margin:0 0 20px;font-size:19px;line-height:1.3;letter-spacing:-.015em}.ds-panel p{margin:0}"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "description": "Queue search input with single outlined shell.",
+      "html": "<label class=\"ds-search\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.65\" stroke-linecap=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m16 16 5 5\"/></svg><input type=\"search\" placeholder=\"Rapor veya çalışan ara...\" aria-label=\"Rapor veya çalışan ara\"></label>",
+      "css": ".ds-search{display:flex;align-items:center;gap:8px;max-width:255px;padding:0 10px;border:1px solid var(--border,#e1e7e3);border-radius:6px;background:#fff;color:#7a8982}.ds-search input{width:100%;min-width:0;padding:9px 0;border:0;outline:0;background:none;color:var(--ink,#253b39);font:12px/1.5 'Segoe UI',Arial,sans-serif}.ds-search:focus-within{outline:3px solid #499a86;outline-offset:3px}"
+    },
+    {
+      "name": "Contact Thumbnail",
+      "kind": "custom",
+      "description": "Selected image tile in a horizontal contact strip.",
+      "html": "<button class=\"ds-thumb\" aria-label=\"Birinci görsel\" aria-current=\"true\"><span>1</span></button>",
+      "css": ".ds-thumb{position:relative;width:66px;height:64px;padding:3px;border:2px solid #376e56;border-radius:6px;background:#edf4e9;cursor:pointer}.ds-thumb span{position:absolute;right:3px;bottom:3px;padding:0 3px;border-radius:2px;background:#fff;color:#315745;font:8px/1.4 'Segoe UI',Arial,sans-serif}.ds-thumb:hover{background:#e6efe4}.ds-thumb:focus-visible{outline:3px solid #499a86;outline-offset:3px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Contact-Sheet Precision",
+    "overview": "The shipped Operate prototype makes the report image and the review decision the main work. A dark navigation rail anchors a light, dense workspace. White panes, thin dividers, restrained state color, and a cool image mat let users scan a queue while keeping the current image large.\n\nThe interface uses ordinary controls and aligned metadata. The contact strip tracks the selected image below the viewer; report state remains readable in words and color. The visual system describes this browser-local demo, not a settled product brand.",
+    "keyCharacteristics": [
+      "Desktop-first, three-area review workspace.",
+      "Compact Segoe UI hierarchy and small operational metadata.",
+      "Dark teal navigation against white working surfaces.",
+      "Contact-strip selection and text-labeled semantic states."
+    ],
+    "rules": [
+      {
+        "name": "The State-With-Text Rule",
+        "body": "A semantic tint accompanies an explicit status label; color alone never communicates report state.",
+        "section": "colors"
+      },
+      {
+        "name": "The Metadata Alignment Rule",
+        "body": "Keep short labels and values in stable rows; the report detail uses an `80px 1fr` definition list, widened to `90px 1fr` below `850px`.",
+        "section": "typography"
+      },
+      {
+        "name": "The Image-First Rule",
+        "body": "In review, preserve enough flexible area for the submitted image while keeping queue selection and the report decision reachable.",
+        "section": "layout"
+      }
+    ],
+    "dos": [
+      "Do give the selected image a large, contained viewer and a visible contact strip.",
+      "Do pair all status colors with written state labels.",
+      "Do use the documented breakpoints and preserve reading order when review columns stack."
+    ],
+    "donts": [
+      "Don't use shadows as the main pane-separation device; borders and tonal surfaces do that work."
+    ]
+  }
+}
